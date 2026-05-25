@@ -1,34 +1,29 @@
-from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 
 from app.db import SessionLocal
 from app.models import Person
 
 
-async def save_people(people: list[dict]):
+async def save_people(
+    people: list[dict],
+):
+
+    if not people:
+        print("No people to save")
+        return
 
     async with SessionLocal() as session:
 
-        existing_ids_query = await session.execute(
-            select(Person.id)
+        stmt = insert(Person).values(people)
+
+        stmt = stmt.on_conflict_do_nothing(
+            index_elements=["id"]
         )
 
-        existing_ids = set(
-            existing_ids_query.scalars().all()
-        )
-
-        new_people = []
-
-        for person_data in people:
-
-            if person_data["id"] in existing_ids:
-                continue
-
-            person = Person(**person_data)
-
-            new_people.append(person)
-
-        session.add_all(new_people)
+        result = await session.execute(stmt)
 
         await session.commit()
 
-        print(f"Saved: {len(new_people)} characters")
+        saved_count = result.rowcount or 0
+
+        print(f"Saved: {saved_count} characters")

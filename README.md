@@ -1,5 +1,3 @@
-# README.md
-
 # Star Wars Async Loader
 
 Асинхронная загрузка персонажей Star Wars из SWAPI в PostgreSQL.
@@ -26,6 +24,10 @@
 - Async PostgreSQL
 - Dockerized PostgreSQL
 - Alembic migrations
+- Pagination API
+- Автоматическая загрузка всех персонажей
+- UPSERT защита от дубликатов
+- Кэширование planet requests
 
 ---
 
@@ -50,6 +52,7 @@ Start-Wars-Async-Loader/
 ├── requirements.txt
 └── README.md
 ```
+
 ---
 
 # Установка
@@ -60,6 +63,7 @@ Start-Wars-Async-Loader/
 git clone https://github.com/Pavel9876543/Start-Wars-Async-Loader
 cd Start-Wars-Async-Loader
 ```
+
 ---
 
 ## 2. Создать виртуальное окружение
@@ -93,9 +97,10 @@ pip install -r requirements.txt
 Создать файл `.env` по шаблону `.env.example`
 
 Пример:
+
 ```env
 DB_HOST=localhost
-DB_PORT=5433
+DB_PORT=5432
 DB_NAME=starwars_db
 DB_USER=postgres
 DB_PASSWORD=postgres
@@ -149,7 +154,12 @@ python -m app.main
 
 # Результат
 
-После запуска все персонажи будут загружены в PostgreSQL.
+После запуска:
+
+- все персонажи будут загружены в PostgreSQL;
+- homeworld сохраняется как название планеты;
+- дубликаты автоматически игнорируются;
+- загрузка выполняется асинхронно.
 
 ---
 
@@ -166,7 +176,7 @@ docker exec -it project-postgres-1 psql -U postgres
 ## Выбор базы данных
 
 ```sql
-\c <DB_NAME>
+\c starwars_db
 ```
 
 ---
@@ -174,7 +184,7 @@ docker exec -it project-postgres-1 psql -U postgres
 ## Просмотр данных
 
 ```sql
-SELECT * FROM people LIMIT 10;
+SELECT * FROM people;
 ```
 
 ---
@@ -185,8 +195,8 @@ SELECT * FROM people LIMIT 10;
 
 Используется:
 
-* aiohttp
-* asyncio.gather
+- aiohttp
+- asyncio.gather
 
 ---
 
@@ -202,13 +212,70 @@ asyncio.Semaphore
 
 ---
 
+## Pagination API
+
+Загрузка персонажей выполняется через pagination API:
+
+```text
+https://www.swapi.tech/api/people?page=1&limit=10
+```
+
+Это позволяет:
+
+- загружать всех персонажей;
+- не зависеть от диапазона ID;
+- корректно обрабатывать пропущенные ID.
+
+---
+
+## Homeworld transformation
+
+SWAPI возвращает URL планеты:
+
+```text
+https://www.swapi.tech/api/planets/1
+```
+
+Во время загрузки выполняется дополнительный запрос,
+и в БД сохраняется название планеты:
+
+```text
+Tatooine
+```
+
+---
+
+## Planet cache
+
+Для уменьшения количества запросов используется cache планет.
+
+Это снижает нагрузку на API и ускоряет загрузку.
+
+---
+
+## UPSERT защита от дубликатов
+
+Используется PostgreSQL:
+
+```sql
+ON CONFLICT DO NOTHING
+```
+
+Это позволяет:
+
+- избегать duplicate records;
+- не загружать все ID из БД;
+- повысить производительность.
+
+---
+
 ## Fault tolerance
 
 Реализованы:
 
-* retries
-* timeout handling
-* 404 handling
+- retries
+- timeout handling
+- 404 handling
 
 ---
 
